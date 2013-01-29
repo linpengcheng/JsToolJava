@@ -2,6 +2,7 @@ package org.sunjw.js;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Stack;
 
 /**
  * JsParser <br>
@@ -31,11 +32,11 @@ import java.util.Queue;
  * 
  */
 public abstract class JsParser {
-	private static final int STRING_TYPE = 0;
-	private static final int OPER_TYPE = 1;
-	private static final int REGULAR_TYPE = 2;
-	private static final int COMMENT_TYPE_1 = 9; // 单行注释
-	private static final int COMMENT_TYPE_2 = 10; // 多行注释
+	protected static final int STRING_TYPE = 0;
+	protected static final int OPER_TYPE = 1;
+	protected static final int REGULAR_TYPE = 2;
+	protected static final int COMMENT_TYPE_1 = 9; // 单行注释
+	protected static final int COMMENT_TYPE_2 = 10; // 多行注释
 
 	protected class TokenAndType {
 		String token;
@@ -57,6 +58,33 @@ public abstract class JsParser {
 	private Queue<TokenAndType> mTokenBQueue;
 
 	private boolean mBGetTokenInit; // 是否是第一次执行 GetToken
+
+	/**
+	 * Get the top element from a stack.
+	 * 
+	 * @param stk
+	 * @param ret
+	 * @return
+	 */
+	public static <T> boolean getStackTop(Stack<T> stk, T ret) {
+		if (stk.size() == 0)
+			return false;
+		ret = stk.peek();
+		return true;
+	}
+
+	/**
+	 * Is the top element of a stack equals to specified object.
+	 * 
+	 * @param stk
+	 * @param eq
+	 * @return
+	 */
+	public static <T> boolean isStackTopEq(Stack<T> stk, T object) {
+		if (stk.size() == 0)
+			return false;
+		return (object == stk.peek());
+	}
 
 	public JsParser() {
 		init();

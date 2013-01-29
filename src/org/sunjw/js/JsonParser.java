@@ -1,0 +1,284 @@
+package org.sunjw.js;
+
+import java.util.Stack;
+
+/**
+ * JsonParser <br>
+ * A Json parser in Java. <br>
+ * Based on jsonparser.h & jsonparser.cpp.
+ * 
+ * @author Sun Junwen
+ * @date 2013-1-29
+ * @version 0.9
+ * 
+ *          Copyright (c) 2012-
+ * 
+ *          This program is free software; you can redistribute it and/or modify
+ *          it under the terms of the GNU General Public License as published by
+ *          the Free Software Foundation; either version 2 of the License, or
+ *          (at your option) any later version.
+ * 
+ *          This program is distributed in the hope that it will be useful, but
+ *          WITHOUT ANY WARRANTY; without even the implied warranty of
+ *          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ *          General Public License for more details.
+ * 
+ *          You should have received a copy of the GNU General Public License
+ *          along with this program; if not, write to the Free Software
+ *          Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ *          02110-1301, USA.
+ * 
+ */
+public abstract class JsonParser extends JsParser {
+	public static final char JS_IF = 'i';
+	public static final char JS_ELSE = 'e';
+	public static final char JS_FOR = 'f';
+	public static final char JS_DO = 'd';
+	public static final char JS_WHILE = 'w';
+	public static final char JS_SWITCH = 's';
+	public static final char JS_CASE = 'c';
+	public static final char JS_TRY = 'r';
+	public static final char JS_CATCH = 'h';
+	public static final char JS_FUNCTION = 'n';
+	public static final char JS_ASSIGN = '=';
+	public static final char JS_BLOCK = '{';
+	public static final char JS_BRACKET = '(';
+	public static final char JS_SQUARE = '[';
+	public static final char JS_HELPER = '\\';
+	public static final char JS_EMPTY = 0;
+
+	private int mNRecuLevel; // 块递归层次
+	private Stack<Character> mBlockStack;
+
+	private long mStartTime;
+	private long mEndTime;
+	private long mDuration;
+
+	public boolean debugOutput;
+
+	public JsonParser() {
+		mNRecuLevel = 0;
+		mBlockStack = new Stack<Character>();
+
+		debugOutput = false;
+		mStartTime = (long) 0.0;
+		mEndTime = (long) 0.0;
+		mDuration = (long) 0.0;
+	}
+
+	public void go(JsonValue jsonValue) {
+		recursiveProc(jsonValue);
+	}
+
+	private void recursiveProc(JsonValue jsonValue) {
+		// initial job
+		if (mNRecuLevel == 0) {
+			mStartTime = System.currentTimeMillis();
+			jsonValue.setValueType(JsonValue.VALUE_TYPE.UNKNOWN_VALUE);
+		}
+
+		++mNRecuLevel;
+		// initial job
+
+		char stackTop = JS_EMPTY;
+		getStackTop(mBlockStack, stackTop);
+
+		String key = new String(), strValue = new String();
+		boolean bGetKey = false;
+		boolean bGetSplitor = false;
+
+		while (getToken()) // 获得下一个 m_tokenA 和 m_tokenB
+		{
+			/*
+			 * Java 版 mTokenA 和 mTokenB 是 StringBuffer, 所以转换成 String
+			 */
+			String strTokenA = mTokenA.toString();
+			String strTokenB = mTokenB.toString();
+
+			// JsonParser 忽略换行, 其它的解析器可能不要忽略
+			if (strTokenA == "\r\n" || strTokenA == "\n"
+					|| mTokenAType == COMMENT_TYPE_1
+					|| mTokenAType == COMMENT_TYPE_2) {
+				continue;
+			}
+
+			/*
+			 * 至此，读取完成 strTokenA 和 strTokenB 已经合并多个换行 已经识别负数 已经识别正则表达式
+			 */
+			if (strTokenA == "{") {
+				mBlockStack.push(JS_BLOCK);
+
+				if (stackTop == JS_EMPTY) {
+					jsonValue.setValueType(JsonValue.VALUE_TYPE.MAP_VALUE);
+					recursiveProc(jsonValue);
+				} else {
+					JsonValue innerValue = new JsonValue();
+					innerValue.setValueType(JsonValue.VALUE_TYPE.MAP_VALUE);
+
+					recursiveProc(innerValue);
+
+					if (stackTop == JS_SQUARE) {
+						jsonValue.arrayPut(innerValue);
+					} else if (stackTop == JS_BLOCK) {
+						bGetKey = false;
+						bGetSplitor = false;
+						jsonValue.mapPut(key, innerValue);
+					}
+				}
+
+				continue;
+			}
+
+			if (strTokenA == "}") {
+				bGetKey = false;
+				bGetSplitor = false;
+
+				mBlockStack.pop();
+				--mNRecuLevel;
+
+				return;
+			}
+
+			if (strTokenA == "[") {
+				mBlockStack.push(JS_SQUARE);
+
+				if (stackTop == JS_EMPTY) {
+					jsonValue.setValueType(JsonValue.VALUE_TYPE.ARRAY_VALUE);
+					recursiveProc(jsonValue);
+				} else {
+					JsonValue innerValue = new JsonValue();
+					innerValue.setValueType(JsonValue.VALUE_TYPE.ARRAY_VALUE);
+
+					recursiveProc(innerValue);
+
+					if (stackTop == JS_SQUARE) {
+						jsonValue.arrayPut(innerValue);
+					} else if (stackTop == JS_BLOCK) {
+						bGetKey = false;
+						bGetSplitor = false;
+						jsonValue.mapPut(key, innerValue);
+					}
+				}
+
+				continue;
+			}
+
+			if (strTokenA == "]") {
+				mBlockStack.pop();
+				--mNRecuLevel;
+
+				return;
+			}
+
+			if (stackTop == JS_BLOCK) {
+				if (!bGetKey && strTokenA != ",") {
+					key = strTokenA;
+
+					if (key.charAt(0) == '\'')
+						key = key.substring(1, key.length() - 2); // strtrim(key,
+																	// String("'"));
+					else if (key.charAt(0) == '"')
+						key = key.substring(1, key.length() - 2); // strtrim(key,
+																	// String("\""));
+
+					bGetKey = true;
+					continue;
+				}
+
+				if (bGetKey && !bGetSplitor && strTokenA == ":") {
+					bGetSplitor = true;
+					continue;
+				}
+
+				if (bGetKey && bGetSplitor) {
+					strValue = readStrValue();
+					// readStrValue may have changed mTokenA and mTokenB
+					strTokenA = mTokenA.toString();
+					strTokenB = mTokenB.toString();
+
+					JsonValue jValue = new JsonValue();
+					genStrJsonValue(jValue, strValue);
+
+					jsonValue.mapPut(key, jValue);
+
+					bGetKey = false;
+					bGetSplitor = false;
+				}
+			}
+
+			if (stackTop == JS_SQUARE) {
+				if (strTokenA != ",") {
+					strValue = readStrValue();
+					// readStrValue may have changed mTokenA and mTokenB
+					strTokenA = mTokenA.toString();
+					strTokenB = mTokenB.toString();
+
+					JsonValue jValue = new JsonValue();
+					genStrJsonValue(jValue, strValue);
+
+					jsonValue.arrayPut(jValue);
+				}
+			}
+		}
+
+		// finished job
+		if (mNRecuLevel == 1) {
+			// FlushLineBuffer();
+			mEndTime = System.currentTimeMillis();
+			mDuration = mEndTime - mStartTime;
+			if (debugOutput) {
+				System.out.println("Processed tokens: " + mTokenCount);
+				System.out.println("Time used: " + mDuration + "s");
+				System.out.println(mTokenCount / mDuration + " tokens/second");
+			}
+		}
+		// finished job
+	}
+
+	private String readStrValue() {
+		String ret = mTokenA.toString();
+		// fix decimal number value bug
+		if (mTokenB.toString() == ".") {
+			// maybe it's a decimal
+			String strDec = mTokenA.toString();
+			getToken();
+			strDec += ".";
+			strDec += mTokenB.toString();
+			ret = strDec;
+			getToken();
+		}
+
+		return ret;
+	}
+
+	private void genStrJsonValue(JsonValue jsonValue, String value) {
+		if (value.charAt(0) == '\'' || value.charAt(0) == '"') {
+			if (value.charAt(0) == '\'')
+				value = value.substring(1, value.length() - 2); // strtrim(value,
+																// string("'"));
+			else if (value.charAt(0) == '"')
+				value = value.substring(1, value.length() - 2); // strtrim(value,
+																// string("\""));
+
+			/*
+			 * STRING_VALUE 存入的时候会把周围的引号去掉 输出的时候统一成 "..." 所以要把里面的引号转义
+			 */
+			value = value.replaceAll("\\'", "'");
+			value = value.replaceAll("\\\"", "\"");
+			value = value.replaceAll("\"", "\\\"");
+
+			jsonValue.setValueType(JsonValue.VALUE_TYPE.STRING_VALUE);
+		} else if (isNumChar(value.charAt(0)) || value.charAt(0) == '-'
+				|| value.charAt(0) == '+') {
+			jsonValue.setValueType(JsonValue.VALUE_TYPE.NUMBER_VALUE);
+		} else if (value == "true" || value == "false") {
+			jsonValue.setValueType(JsonValue.VALUE_TYPE.BOOL_VALUE);
+		} else if (value.charAt(0) == '/') {
+			jsonValue.setValueType(JsonValue.VALUE_TYPE.REGULAR_VALUE);
+		} else {
+			jsonValue.setValueType(JsonValue.VALUE_TYPE.UNKNOWN_VALUE);
+		}
+
+		jsonValue.setStrValue(value);
+	}
+}
