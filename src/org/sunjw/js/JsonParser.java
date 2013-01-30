@@ -1,5 +1,6 @@
 package org.sunjw.js;
 
+import java.io.IOException;
 import java.util.Stack;
 
 /**
@@ -66,11 +67,11 @@ public abstract class JsonParser extends JsParser {
 		mDuration = (long) 0.0;
 	}
 
-	public void go(JsonValue jsonValue) {
+	public void go(JsonValue jsonValue) throws IOException {
 		recursiveProc(jsonValue);
 	}
 
-	private void recursiveProc(JsonValue jsonValue) {
+	private void recursiveProc(JsonValue jsonValue) throws IOException {
 		// initial job
 		if (mNRecuLevel == 0) {
 			mStartTime = System.currentTimeMillis();
@@ -81,7 +82,7 @@ public abstract class JsonParser extends JsParser {
 		// initial job
 
 		char stackTop = JS_EMPTY;
-		getStackTop(mBlockStack, stackTop);
+		stackTop = getStackTop(mBlockStack, stackTop);
 
 		String key = new String(), strValue = new String();
 		boolean bGetKey = false;
@@ -96,7 +97,7 @@ public abstract class JsonParser extends JsParser {
 			String strTokenB = mTokenB.toString();
 
 			// JsonParser 忽略换行, 其它的解析器可能不要忽略
-			if (strTokenA == "\r\n" || strTokenA == "\n"
+			if (strTokenA.equals("\r\n") || strTokenA.equals("\n")
 					|| mTokenAType == COMMENT_TYPE_1
 					|| mTokenAType == COMMENT_TYPE_2) {
 				continue;
@@ -105,7 +106,7 @@ public abstract class JsonParser extends JsParser {
 			/*
 			 * 至此，读取完成 strTokenA 和 strTokenB 已经合并多个换行 已经识别负数 已经识别正则表达式
 			 */
-			if (strTokenA == "{") {
+			if (strTokenA.equals("{")) {
 				mBlockStack.push(JS_BLOCK);
 
 				if (stackTop == JS_EMPTY) {
@@ -129,7 +130,7 @@ public abstract class JsonParser extends JsParser {
 				continue;
 			}
 
-			if (strTokenA == "}") {
+			if (strTokenA.equals("}")) {
 				bGetKey = false;
 				bGetSplitor = false;
 
@@ -139,7 +140,7 @@ public abstract class JsonParser extends JsParser {
 				return;
 			}
 
-			if (strTokenA == "[") {
+			if (strTokenA.equals("[")) {
 				mBlockStack.push(JS_SQUARE);
 
 				if (stackTop == JS_EMPTY) {
@@ -163,7 +164,7 @@ public abstract class JsonParser extends JsParser {
 				continue;
 			}
 
-			if (strTokenA == "]") {
+			if (strTokenA.equals("]")) {
 				mBlockStack.pop();
 				--mNRecuLevel;
 
@@ -171,21 +172,21 @@ public abstract class JsonParser extends JsParser {
 			}
 
 			if (stackTop == JS_BLOCK) {
-				if (!bGetKey && strTokenA != ",") {
+				if (!bGetKey && !strTokenA.equals(",")) {
 					key = strTokenA;
 
 					if (key.charAt(0) == '\'')
-						key = key.substring(1, key.length() - 2); // strtrim(key,
+						key = key.substring(1, key.length() - 1); // strtrim(key,
 																	// String("'"));
 					else if (key.charAt(0) == '"')
-						key = key.substring(1, key.length() - 2); // strtrim(key,
+						key = key.substring(1, key.length() - 1); // strtrim(key,
 																	// String("\""));
 
 					bGetKey = true;
 					continue;
 				}
 
-				if (bGetKey && !bGetSplitor && strTokenA == ":") {
+				if (bGetKey && !bGetSplitor && strTokenA.equals(":")) {
 					bGetSplitor = true;
 					continue;
 				}
@@ -207,7 +208,7 @@ public abstract class JsonParser extends JsParser {
 			}
 
 			if (stackTop == JS_SQUARE) {
-				if (strTokenA != ",") {
+				if (!strTokenA.equals(",")) {
 					strValue = readStrValue();
 					// readStrValue may have changed mTokenA and mTokenB
 					strTokenA = mTokenA.toString();
@@ -235,10 +236,10 @@ public abstract class JsonParser extends JsParser {
 		// finished job
 	}
 
-	private String readStrValue() {
+	private String readStrValue() throws IOException {
 		String ret = mTokenA.toString();
 		// fix decimal number value bug
-		if (mTokenB.toString() == ".") {
+		if (mTokenB.toString().equals(".")) {
 			// maybe it's a decimal
 			String strDec = mTokenA.toString();
 			getToken();
@@ -254,10 +255,10 @@ public abstract class JsonParser extends JsParser {
 	private void genStrJsonValue(JsonValue jsonValue, String value) {
 		if (value.charAt(0) == '\'' || value.charAt(0) == '"') {
 			if (value.charAt(0) == '\'')
-				value = value.substring(1, value.length() - 2); // strtrim(value,
+				value = value.substring(1, value.length() - 1); // strtrim(value,
 																// string("'"));
 			else if (value.charAt(0) == '"')
-				value = value.substring(1, value.length() - 2); // strtrim(value,
+				value = value.substring(1, value.length() - 1); // strtrim(value,
 																// string("\""));
 
 			/*
@@ -271,7 +272,7 @@ public abstract class JsonParser extends JsParser {
 		} else if (isNumChar(value.charAt(0)) || value.charAt(0) == '-'
 				|| value.charAt(0) == '+') {
 			jsonValue.setValueType(JsonValue.VALUE_TYPE.NUMBER_VALUE);
-		} else if (value == "true" || value == "false") {
+		} else if (value.equals("true") || value.equals("false")) {
 			jsonValue.setValueType(JsonValue.VALUE_TYPE.BOOL_VALUE);
 		} else if (value.charAt(0) == '/') {
 			jsonValue.setValueType(JsonValue.VALUE_TYPE.REGULAR_VALUE);

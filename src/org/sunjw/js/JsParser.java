@@ -1,5 +1,6 @@
 package org.sunjw.js;
 
+import java.io.IOException;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Stack;
@@ -66,11 +67,12 @@ public abstract class JsParser {
 	 * @param ret
 	 * @return
 	 */
-	public static <T> boolean getStackTop(Stack<T> stk, T ret) {
+	public static <T> T getStackTop(Stack<T> stk, T empty) {
 		if (stk.size() == 0)
-			return false;
-		ret = stk.peek();
-		return true;
+			return empty;
+		// ret = stk.peek();
+		// return true;
+		return stk.peek();
 	}
 
 	/**
@@ -173,13 +175,16 @@ public abstract class JsParser {
 	 * derived class.
 	 * 
 	 * @return
+	 * @throws IOException
 	 */
-	protected abstract char getChar();
+	protected abstract char getChar() throws IOException;
 
 	/**
 	 * Inner function to process character input.
+	 * 
+	 * @throws IOException
 	 */
-	private void getTokenRaw() {
+	private void getTokenRaw() throws IOException {
 		if (!mBGetTokenInit) {
 			mCharB = getChar();
 		}
@@ -356,7 +361,8 @@ public abstract class JsParser {
 				if (isSingleOper(mCharA) || isNormalChar(mCharB)
 						|| isBlankChar(mCharB) || isQuote(mCharB)) {
 					mTokenBType = OPER_TYPE;
-					mTokenB = new StringBuffer(mCharA); // 单字符符号
+					mTokenB = new StringBuffer(); // 单字符符号
+					mTokenB.append(mCharA);
 					return;
 				}
 
@@ -389,7 +395,8 @@ public abstract class JsParser {
 				} else {
 					// 还是单字符的
 					mTokenBType = OPER_TYPE;
-					mTokenB = new StringBuffer(mCharA); // 单字符符号
+					mTokenB = new StringBuffer(); // 单字符符号
+					mTokenB.append(mCharA);
 					return;
 				}
 
@@ -401,7 +408,7 @@ public abstract class JsParser {
 		}
 	}
 
-	protected boolean getToken() {
+	protected boolean getToken() throws IOException {
 		if (!mBGetTokenInit) {
 			// 第一次多调用一次 GetTokenRaw
 			getTokenRaw();
@@ -412,7 +419,7 @@ public abstract class JsParser {
 		preparePosNeg(); // 判断正负数
 
 		++mTokenCount;
-		mTokenA = mTokenB;
+		mTokenA = new StringBuffer(mTokenB);
 		mTokenAType = mTokenBType;
 
 		if (mTokenBQueue.size() == 0) {
@@ -427,13 +434,15 @@ public abstract class JsParser {
 			mTokenBType = temp.type;
 		}
 
-		return (mCharA != 0 || mTokenA.toString() != "");
+		return (mCharA != 0 && mTokenA.toString().length() != 0);
 	}
 
 	/**
 	 * 预处理正则表达式
+	 * 
+	 * @throws IOException
 	 */
-	private void prepareRegular() {
+	private void prepareRegular() throws IOException {
 		/*
 		 * 先处理一下正则 m_tokenB[0] == /，且 m_tokenB 不是注释 m_tokenA 不是 STRING (除了
 		 * m_tokenA == return) 而且 m_tokenA 的最后一个字符是下面这些
@@ -441,7 +450,7 @@ public abstract class JsParser {
 		// size_t last = m_tokenA.size() > 0 ? m_tokenA.size() - 1 : 0;
 		char tokenALast = mTokenA.length() > 0 ? mTokenA.charAt(mTokenA
 				.length() - 1) : 0;
-		char tokenBFirst = mTokenB.charAt(0);
+		char tokenBFirst = mTokenB.length() > 0 ? mTokenB.charAt(0) : 0;
 		if (tokenBFirst == '/'
 				&& mTokenBType != COMMENT_TYPE_1
 				&& mTokenBType != COMMENT_TYPE_2
@@ -454,8 +463,10 @@ public abstract class JsParser {
 
 	/**
 	 * 预处理正负号
+	 * 
+	 * @throws IOException
 	 */
-	private void preparePosNeg() {
+	private void preparePosNeg() throws IOException {
 		/*
 		 * 如果 m_tokenB 是 -,+ 号 而且 m_tokenA 不是字符串型也不是正则表达式 而且 m_tokenA 不是 ++, --,
 		 * ], ) 而且 m_charB 是一个 NormalChar 那么 m_tokenB 实际上是一个正负数
@@ -474,8 +485,10 @@ public abstract class JsParser {
 
 	/**
 	 * 预处理 TokenB
+	 * 
+	 * @throws IOException
 	 */
-	private void prepareTokenB() {
+	private void prepareTokenB() throws IOException {
 		// char stackTop = m_blockStack.top();
 
 		/*
