@@ -90,23 +90,17 @@ public abstract class JsonParser extends JsParser {
 
 		while (getToken()) // 获得下一个 m_tokenA 和 m_tokenB
 		{
-			/*
-			 * Java 版 mTokenA 和 mTokenB 是 StringBuffer, 所以转换成 String
-			 */
-			String strTokenA = mTokenA.toString();
-			String strTokenB = mTokenB.toString();
-
 			// JsonParser 忽略换行, 其它的解析器可能不要忽略
-			if (strTokenA.equals("\r\n") || strTokenA.equals("\n")
-					|| mTokenAType == COMMENT_TYPE_1
-					|| mTokenAType == COMMENT_TYPE_2) {
+			if (mTokenA.code.equals("\r\n") || mTokenA.code.equals("\n")
+					|| mTokenA.type == COMMENT_TYPE_1
+					|| mTokenA.type == COMMENT_TYPE_2) {
 				continue;
 			}
 
 			/*
-			 * 至此，读取完成 strTokenA 和 strTokenB 已经合并多个换行 已经识别负数 已经识别正则表达式
+			 * 至此，读取完成 mTokenA.code 和 mTokenB 已经合并多个换行 已经识别负数 已经识别正则表达式
 			 */
-			if (strTokenA.equals("{")) {
+			if (mTokenA.code.equals("{")) {
 				mBlockStack.push(JS_BLOCK);
 
 				if (stackTop == JS_EMPTY) {
@@ -130,7 +124,7 @@ public abstract class JsonParser extends JsParser {
 				continue;
 			}
 
-			if (strTokenA.equals("}")) {
+			if (mTokenA.code.equals("}")) {
 				bGetKey = false;
 				bGetSplitor = false;
 
@@ -140,7 +134,7 @@ public abstract class JsonParser extends JsParser {
 				return;
 			}
 
-			if (strTokenA.equals("[")) {
+			if (mTokenA.code.equals("[")) {
 				mBlockStack.push(JS_SQUARE);
 
 				if (stackTop == JS_EMPTY) {
@@ -164,7 +158,7 @@ public abstract class JsonParser extends JsParser {
 				continue;
 			}
 
-			if (strTokenA.equals("]")) {
+			if (mTokenA.code.equals("]")) {
 				mBlockStack.pop();
 				--mNRecuLevel;
 
@@ -172,8 +166,8 @@ public abstract class JsonParser extends JsParser {
 			}
 
 			if (stackTop == JS_BLOCK) {
-				if (!bGetKey && !strTokenA.equals(",")) {
-					key = strTokenA;
+				if (!bGetKey && !mTokenA.code.equals(",")) {
+					key = mTokenA.code.toString();
 
 					if (key.charAt(0) == '\'')
 						key = key.substring(1, key.length() - 1); // strtrim(key,
@@ -186,16 +180,13 @@ public abstract class JsonParser extends JsParser {
 					continue;
 				}
 
-				if (bGetKey && !bGetSplitor && strTokenA.equals(":")) {
+				if (bGetKey && !bGetSplitor && mTokenA.code.equals(":")) {
 					bGetSplitor = true;
 					continue;
 				}
 
 				if (bGetKey && bGetSplitor) {
 					strValue = readStrValue();
-					// readStrValue may have changed mTokenA and mTokenB
-					strTokenA = mTokenA.toString();
-					strTokenB = mTokenB.toString();
 
 					JsonValue jValue = new JsonValue();
 					genStrJsonValue(jValue, strValue);
@@ -208,11 +199,8 @@ public abstract class JsonParser extends JsParser {
 			}
 
 			if (stackTop == JS_SQUARE) {
-				if (!strTokenA.equals(",")) {
+				if (!mTokenA.code.equals(",")) {
 					strValue = readStrValue();
-					// readStrValue may have changed mTokenA and mTokenB
-					strTokenA = mTokenA.toString();
-					strTokenB = mTokenB.toString();
 
 					JsonValue jValue = new JsonValue();
 					genStrJsonValue(jValue, strValue);
@@ -237,14 +225,14 @@ public abstract class JsonParser extends JsParser {
 	}
 
 	private String readStrValue() throws IOException {
-		String ret = mTokenA.toString();
+		String ret = mTokenA.code.toString();
 		// fix decimal number value bug
-		if (mTokenB.toString().equals(".")) {
+		if (mTokenB.code.equals(".")) {
 			// maybe it's a decimal
-			String strDec = mTokenA.toString();
+			String strDec = mTokenA.code.toString();
 			getToken();
 			strDec += ".";
-			strDec += mTokenB.toString();
+			strDec += mTokenB.code.toString();
 			ret = strDec;
 			getToken();
 		}

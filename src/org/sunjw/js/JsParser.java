@@ -5,6 +5,8 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Stack;
 
+import org.sunjw.js.util.TokenBuffer;
+
 /**
  * JsParser <br>
  * A JavaScript code parser in Java. <br>
@@ -39,24 +41,40 @@ public abstract class JsParser {
 	protected static final int COMMENT_TYPE_1 = 9; // 单行注释
 	protected static final int COMMENT_TYPE_2 = 10; // 多行注释
 
-	protected class TokenAndType {
-		String token;
+	protected class Token {
+		TokenBuffer code;
 		int type;
+		long line;
+
+		public Token() {
+			code = new TokenBuffer();
+			type = STRING_TYPE;
+			line = -1;
+		}
+
+		public Token(Token anotherToken) {
+			if (this == anotherToken)
+				return;
+
+			code = new TokenBuffer(anotherToken.code.toString());
+			type = anotherToken.type;
+			line = anotherToken.line;
+		}
 	}
 
 	protected char mCharA;
 	protected char mCharB;
-	protected int mTokenAType;
-	protected int mTokenBType;
-	protected StringBuffer mTokenA;
-	protected StringBuffer mTokenB;
-	protected int mTokenCount;
+	protected Token mTokenA;
+	protected Token mTokenB;
+
+	protected long mLineCount;
+	protected long mTokenCount;
 
 	private String mStrBeforeReg; // 判断正则时，正则前面可以出现的字符
 
 	private boolean mBRegular; // tokenB 实际是正则 GetToken 用到的两个成员状态
 	private boolean mBPosNeg; // tokenB 实际是正负数
-	private Queue<TokenAndType> mTokenBQueue;
+	private Queue<Token> mTokenBQueue;
 
 	private boolean mBGetTokenInit; // 是否是第一次执行 GetToken
 
@@ -93,8 +111,8 @@ public abstract class JsParser {
 	}
 
 	private void init() {
-		mTokenA = new StringBuffer();
-		mTokenB = new StringBuffer();
+		mTokenA = new Token();
+		mTokenB = new Token();
 
 		mTokenCount = 0;
 
@@ -104,7 +122,7 @@ public abstract class JsParser {
 		mBPosNeg = false;
 		mBGetTokenInit = false;
 
-		mTokenBQueue = new LinkedList<TokenAndType>();
+		mTokenBQueue = new LinkedList<Token>();
 	}
 
 	/**
@@ -191,13 +209,13 @@ public abstract class JsParser {
 
 		// normal procedure
 		if (!mBRegular && !mBPosNeg) {
-			mTokenBType = STRING_TYPE;
-			mTokenB = new StringBuffer();
+			mTokenB = new Token();
+			mTokenB.type = STRING_TYPE;
 		} else if (mBRegular) {
-			mTokenBType = REGULAR_TYPE; // 正则
+			mTokenB.type = REGULAR_TYPE; // 正则
 			// m_tokenB.push_back('/');
 		} else {
-			mTokenBType = STRING_TYPE; // 正负数
+			mTokenB.type = STRING_TYPE; // 正负数
 		}
 
 		boolean bQuote = false;
@@ -225,11 +243,11 @@ public abstract class JsParser {
 			// 正则需要在 token 级别判断
 			if (mBRegular) {
 				// 正则状态全部输出，直到 /
-				mTokenB.append(mCharA);
+				mTokenB.code.append(mCharA);
 
 				if (mCharA == '\\' && (mCharB == '/' || mCharB == '\\')) // 转义字符
 				{
-					mTokenB.append(mCharB);
+					mTokenB.code.append(mCharB);
 					mCharB = getChar();
 				}
 
@@ -257,11 +275,11 @@ public abstract class JsParser {
 
 			if (bQuote) {
 				// 引号状态，全部输出，直到引号结束
-				mTokenB.append(mCharA);
+				mTokenB.code.append(mCharA);
 
 				if (mCharA == '\\' && (mCharB == chQuote || mCharB == '\\')) // 转义字符
 				{
-					mTokenB.append(mCharB);
+					mTokenB.code.append(mCharB);
 					mCharB = getChar();
 				}
 
@@ -273,31 +291,31 @@ public abstract class JsParser {
 
 			if (bComment) {
 				// 注释状态，全部输出
-				if (mTokenBType == COMMENT_TYPE_2) {
+				if (mTokenB.type == COMMENT_TYPE_2) {
 					// /*...*/每行前面的\t, ' '都要删掉
 					if (bLineBegin && (mCharA == '\t' || mCharA == ' '))
 						continue;
 					else if (bLineBegin && mCharA == '*')
-						mTokenB.append(' ');
+						mTokenB.code.append(' ');
 
 					bLineBegin = false;
 
 					if (mCharA == '\n')
 						bLineBegin = true;
 				}
-				mTokenB.append(mCharA);
+				mTokenB.code.append(mCharA);
 
 				if (chComment == '*') {
 					// 直到 */
-					mTokenBType = COMMENT_TYPE_2;
+					mTokenB.type = COMMENT_TYPE_2;
 					if (mCharA == '*' && mCharB == '/') {
-						mTokenB.append(mCharB);
+						mTokenB.code.append(mCharB);
 						mCharB = getChar();
 						return;
 					}
 				} else {
 					// 直到换行
-					mTokenBType = COMMENT_TYPE_1;
+					mTokenB.type = COMMENT_TYPE_1;
 					if (mCharA == '\n')
 						return;
 				}
@@ -306,8 +324,8 @@ public abstract class JsParser {
 			}
 
 			if (isNormalChar(mCharA)) {
-				mTokenBType = STRING_TYPE;
-				mTokenB.append(mCharA);
+				mTokenB.type = STRING_TYPE;
+				mTokenB.code.append(mCharA);
 
 				// 解决类似 82e-2, 442e+6, 555E-6 的问题
 				// 因为这是立即数，所以只能符合以下的表达形式
@@ -323,7 +341,7 @@ public abstract class JsParser {
 						&& (mCharB == '-' || mCharB == '+' || isNumChar(mCharB))) {
 					bNum = true;
 					if (mCharB == '-' || mCharB == '+') {
-						mTokenB.append(mCharB);
+						mTokenB.code.append(mCharB);
 						mCharB = getChar();
 					}
 				}
@@ -343,8 +361,8 @@ public abstract class JsParser {
 					bQuote = true;
 					chQuote = mCharA;
 
-					mTokenBType = STRING_TYPE;
-					mTokenB.append(mCharA);
+					mTokenB.type = STRING_TYPE;
+					mTokenB.code.append(mCharA);
 					continue;
 				}
 
@@ -354,15 +372,15 @@ public abstract class JsParser {
 					chComment = mCharB;
 
 					// m_tokenBType = COMMENT_TYPE;
-					mTokenB.append(mCharA);
+					mTokenB.code.append(mCharA);
 					continue;
 				}
 
 				if (isSingleOper(mCharA) || isNormalChar(mCharB)
 						|| isBlankChar(mCharB) || isQuote(mCharB)) {
-					mTokenBType = OPER_TYPE;
-					mTokenB = new StringBuffer(); // 单字符符号
-					mTokenB.append(mCharA);
+					mTokenB = new Token(); // 单字符符号
+					mTokenB.type = OPER_TYPE;
+					mTokenB.code.append(mCharA);
 					return;
 				}
 
@@ -370,33 +388,32 @@ public abstract class JsParser {
 				if ((mCharB == '=' || mCharB == mCharA)
 						|| (mCharA == '-' && mCharB == '>')) {
 					// 的确是多字符符号
-					mTokenBType = OPER_TYPE;
-					mTokenB.append(mCharA);
-					mTokenB.append(mCharB);
+					mTokenB.type = OPER_TYPE;
+					mTokenB.code.append(mCharA);
+					mTokenB.code.append(mCharB);
 					mCharB = getChar();
-					if ((mTokenB.toString() == "=="
-							|| mTokenB.toString() == "!="
-							|| mTokenB.toString() == "<<" || mTokenB.toString() == ">>")
+					if ((mTokenB.code.equals("==") || mTokenB.code.equals("!=")
+							|| mTokenB.code.equals("<<") || mTokenB.code.equals(">>"))
 							&& mCharB == '=') {
 						// 三字符 ===, !==, <<=, >>=
-						mTokenB.append(mCharB);
+						mTokenB.code.append(mCharB);
 						mCharB = getChar();
-					} else if (mTokenB.toString() == ">>" && mCharB == '>') {
+					} else if (mTokenB.code.equals(">>") && mCharB == '>') {
 						// >>>, >>>=
-						mTokenB.append(mCharB);
+						mTokenB.code.append(mCharB);
 						mCharB = getChar();
 						if (mCharB == '=') // >>>=
 						{
-							mTokenB.append(mCharB);
+							mTokenB.code.append(mCharB);
 							mCharB = getChar();
 						}
 					}
 					return;
 				} else {
 					// 还是单字符的
-					mTokenBType = OPER_TYPE;
-					mTokenB = new StringBuffer(); // 单字符符号
-					mTokenB.append(mCharA);
+					mTokenB = new Token(); // 单字符符号
+					mTokenB.type = OPER_TYPE;
+					mTokenB.code.append(mCharA);
 					return;
 				}
 
@@ -419,22 +436,20 @@ public abstract class JsParser {
 		preparePosNeg(); // 判断正负数
 
 		++mTokenCount;
-		mTokenA = new StringBuffer(mTokenB);
-		mTokenAType = mTokenBType;
+		mTokenA = new Token(mTokenB);
 
 		if (mTokenBQueue.size() == 0) {
 			getTokenRaw();
 			prepareTokenB(); // 看看是不是要跳过换行
 		} else {
 			// 有排队的换行
-			TokenAndType temp;
+			Token temp;
 			temp = mTokenBQueue.poll();
 			// mTokenBQueue.pop();
-			mTokenB = new StringBuffer(temp.token);
-			mTokenBType = temp.type;
+			mTokenB = new Token(temp);
 		}
 
-		return (mCharA != 0 && mTokenA.toString().length() != 0);
+		return (mCharA != 0 && mTokenA.code.length() != 0);
 	}
 
 	/**
@@ -448,14 +463,15 @@ public abstract class JsParser {
 		 * m_tokenA == return) 而且 m_tokenA 的最后一个字符是下面这些
 		 */
 		// size_t last = m_tokenA.size() > 0 ? m_tokenA.size() - 1 : 0;
-		char tokenALast = mTokenA.length() > 0 ? mTokenA.charAt(mTokenA
-				.length() - 1) : 0;
-		char tokenBFirst = mTokenB.length() > 0 ? mTokenB.charAt(0) : 0;
+		char tokenALast = mTokenA.code.length() > 0 ? mTokenA.code
+				.charAt(mTokenA.code.length() - 1) : 0;
+		char tokenBFirst = mTokenB.code.length() > 0 ? mTokenB.code.charAt(0)
+				: 0;
 		if (tokenBFirst == '/'
-				&& mTokenBType != COMMENT_TYPE_1
-				&& mTokenBType != COMMENT_TYPE_2
-				&& ((mTokenAType != STRING_TYPE && mStrBeforeReg
-						.indexOf(tokenALast) != -1) || mTokenA.toString() == "return")) {
+				&& mTokenB.type != COMMENT_TYPE_1
+				&& mTokenB.type != COMMENT_TYPE_2
+				&& ((mTokenA.type != STRING_TYPE && mStrBeforeReg
+						.indexOf(tokenALast) != -1) || mTokenA.code.equals("return"))) {
 			mBRegular = true;
 			getTokenRaw(); // 把正则内容加到 m_tokenB
 		}
@@ -471,12 +487,12 @@ public abstract class JsParser {
 		 * 如果 m_tokenB 是 -,+ 号 而且 m_tokenA 不是字符串型也不是正则表达式 而且 m_tokenA 不是 ++, --,
 		 * ], ) 而且 m_charB 是一个 NormalChar 那么 m_tokenB 实际上是一个正负数
 		 */
-		if (mTokenBType == OPER_TYPE
-				&& (mTokenB.toString() == "-" || mTokenB.toString() == "+")
-				&& (mTokenAType != STRING_TYPE || mTokenA.toString() == "return")
-				&& mTokenAType != REGULAR_TYPE && mTokenA.toString() != "++"
-				&& mTokenA.toString() != "--" && mTokenA.toString() != "]"
-				&& mTokenA.toString() != ")" && isNormalChar(mCharB)) {
+		if (mTokenB.type == OPER_TYPE
+				&& (mTokenB.code.equals("-") || mTokenB.code.equals("+"))
+				&& (mTokenA.type != STRING_TYPE || mTokenA.code.equals("return"))
+				&& mTokenA.type != REGULAR_TYPE && !mTokenA.code.equals("++")
+				&& !mTokenA.code.equals("--") && !mTokenA.code.equals("]")
+				&& !mTokenA.code.equals(")") && isNormalChar(mCharB)) {
 			// m_tokenB 实际上是正负数
 			mBPosNeg = true;
 			getTokenRaw();
@@ -496,32 +512,31 @@ public abstract class JsParser {
 		 * 如果最后读到的不是上面那几个，再把去掉的换行补上
 		 */
 		int c = 0;
-		while (mTokenB.toString() == "\n" || mTokenB.toString() == "\r\n") {
+		while (mTokenB.code.equals("\n") || mTokenB.code.equals("\r\n")) {
 			++c;
 			getTokenRaw();
 		}
 
-		if (mTokenB.toString() != "else" && mTokenB.toString() != "while"
-				&& mTokenB.toString() != "catch" && mTokenB.toString() != ","
-				&& mTokenB.toString() != ";" && mTokenB.toString() != ")") {
+		if (!mTokenB.code.equals("else") && !mTokenB.code.equals("while")
+				&& !mTokenB.code.equals("catch") && !mTokenB.code.equals(",")
+				&& !mTokenB.code.equals(";") && !mTokenB.code.equals(")")) {
 			// 将去掉的换行压入队列，先处理
-			if (mTokenA.toString() == "{" && mTokenB.toString() == "}")
+			if (mTokenA.code.equals("{") && mTokenB.code.equals("}"))
 				return; // 空 {}
 
-			TokenAndType temp = new TokenAndType();
+			Token temp = new Token();
 			c = c > 2 ? 2 : c;
 			for (; c > 0; --c) {
-				temp.token = "\n";
+				temp.code = new TokenBuffer("\n");
 				temp.type = OPER_TYPE;
 				mTokenBQueue.offer(temp);
 			}
-			temp.token = mTokenB.toString();
-			temp.type = mTokenBType;
+
+			temp = new Token(mTokenB);
 			mTokenBQueue.offer(temp);
 			temp = mTokenBQueue.poll();
 			// mTokenBQueue.pop();
-			mTokenB = new StringBuffer(temp.token);
-			mTokenBType = temp.type;
+			mTokenB = new Token(temp);
 		}
 	}
 }
