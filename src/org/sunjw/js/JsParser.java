@@ -115,6 +115,7 @@ public abstract class JsParser {
 		mTokenB = new Token();
 
 		mTokenCount = 0;
+		mLineCount = 1;
 
 		mStrBeforeReg = "(,=:[!&|?+{};\n";
 
@@ -211,6 +212,7 @@ public abstract class JsParser {
 		if (!mBRegular && !mBPosNeg) {
 			mTokenB = new Token();
 			mTokenB.type = STRING_TYPE;
+			mTokenB.line = mLineCount;
 		} else if (mBRegular) {
 			mTokenB.type = REGULAR_TYPE; // 正则
 			// m_tokenB.push_back('/');
@@ -231,6 +233,10 @@ public abstract class JsParser {
 			mCharA = mCharB;
 			if (mCharA == 0)
 				return;
+			
+			if(mCharA == '\n')
+				++mLineCount;
+			
 			do {
 				mCharB = getChar();
 			} while (mCharB == '\r');

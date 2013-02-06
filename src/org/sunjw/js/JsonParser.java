@@ -85,6 +85,7 @@ public abstract class JsonParser extends JsParser {
 		stackTop = getStackTop(mBlockStack, stackTop);
 
 		String key = new String(), strValue = new String();
+		long keyLine = -1, valLine = -1;
 		boolean bGetKey = false;
 		boolean bGetSplitor = false;
 
@@ -102,6 +103,7 @@ public abstract class JsonParser extends JsParser {
 			 */
 			if (mTokenA.code.equals("{")) {
 				mBlockStack.push(JS_BLOCK);
+				long blockLine = mTokenA.line;
 
 				if (stackTop == JS_EMPTY) {
 					jsonValue.setValueType(JsonValue.VALUE_TYPE.MAP_VALUE);
@@ -113,10 +115,12 @@ public abstract class JsonParser extends JsParser {
 					recursiveProc(innerValue);
 
 					if (stackTop == JS_SQUARE) {
+						innerValue.line = blockLine;
 						jsonValue.arrayPut(innerValue);
 					} else if (stackTop == JS_BLOCK) {
 						bGetKey = false;
 						bGetSplitor = false;
+						innerValue.line = keyLine;
 						jsonValue.mapPut(key, innerValue);
 					}
 				}
@@ -136,6 +140,7 @@ public abstract class JsonParser extends JsParser {
 
 			if (mTokenA.code.equals("[")) {
 				mBlockStack.push(JS_SQUARE);
+				long squareLine = mTokenA.line;
 
 				if (stackTop == JS_EMPTY) {
 					jsonValue.setValueType(JsonValue.VALUE_TYPE.ARRAY_VALUE);
@@ -147,10 +152,12 @@ public abstract class JsonParser extends JsParser {
 					recursiveProc(innerValue);
 
 					if (stackTop == JS_SQUARE) {
+						innerValue.line = squareLine;
 						jsonValue.arrayPut(innerValue);
 					} else if (stackTop == JS_BLOCK) {
 						bGetKey = false;
 						bGetSplitor = false;
+						innerValue.line = keyLine;
 						jsonValue.mapPut(key, innerValue);
 					}
 				}
@@ -168,6 +175,7 @@ public abstract class JsonParser extends JsParser {
 			if (stackTop == JS_BLOCK) {
 				if (!bGetKey && !mTokenA.code.equals(",")) {
 					key = mTokenA.code.toString();
+					keyLine = mTokenA.line;
 
 					if (key.charAt(0) == '\'')
 						key = key.substring(1, key.length() - 1); // strtrim(key,
@@ -187,10 +195,12 @@ public abstract class JsonParser extends JsParser {
 
 				if (bGetKey && bGetSplitor) {
 					strValue = readStrValue();
+					valLine = mTokenA.line;
 
 					JsonValue jValue = new JsonValue();
 					genStrJsonValue(jValue, strValue);
 
+					jValue.line = keyLine;
 					jsonValue.mapPut(key, jValue);
 
 					bGetKey = false;
@@ -201,10 +211,12 @@ public abstract class JsonParser extends JsParser {
 			if (stackTop == JS_SQUARE) {
 				if (!mTokenA.code.equals(",")) {
 					strValue = readStrValue();
+					valLine = mTokenA.line;
 
 					JsonValue jValue = new JsonValue();
 					genStrJsonValue(jValue, strValue);
 
+					jValue.line = valLine;
 					jsonValue.arrayPut(jValue);
 				}
 			}

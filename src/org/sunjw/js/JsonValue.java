@@ -40,6 +40,8 @@ public class JsonValue {
 	private String mStrValue;
 	private LinkedHashMap<String, JsonValue> mMapValue;
 	private Vector<JsonValue> mArrayValue;
+	
+	public long line; // Line number
 
 	/**
 	 * Default constructor
@@ -61,6 +63,7 @@ public class JsonValue {
 		mStrValue = new String();
 		mMapValue = new LinkedHashMap<String, JsonValue>();
 		mArrayValue = new Vector<JsonValue>();
+		line = -1;
 	}
 
 	/**
