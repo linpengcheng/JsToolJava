@@ -7,7 +7,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.apache.commons.lang.StringUtils;
-import org.sunjw.js.util.TokenBuffer;
+import org.sunjw.js.util.CodeBuffer;
 
 /**
  * JsFormatter <br>
@@ -254,7 +254,7 @@ public abstract class JsFormatter extends JsParser {
 	}
 
 	private void putLineBuffer() {
-		TokenBuffer line = new TokenBuffer("");
+		CodeBuffer line = new CodeBuffer("");
 		line.append(trimRightSpace(mLineBuffer.toString()));
 
 		if (!line.equals("") || mBIndentInEmpty) // Fix "JSLint unexpect space"

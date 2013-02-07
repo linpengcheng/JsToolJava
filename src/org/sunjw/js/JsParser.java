@@ -5,7 +5,7 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Stack;
 
-import org.sunjw.js.util.TokenBuffer;
+import org.sunjw.js.util.CodeBuffer;
 
 /**
  * JsParser <br>
@@ -58,12 +58,12 @@ public abstract class JsParser {
 	protected static final char JS_EMPTY = 0;
 
 	protected class Token {
-		TokenBuffer code;
+		CodeBuffer code;
 		int type;
 		long line;
 
 		public Token() {
-			code = new TokenBuffer();
+			code = new CodeBuffer();
 			type = STRING_TYPE;
 			line = -1;
 		}
@@ -72,7 +72,7 @@ public abstract class JsParser {
 			if (this == anotherToken)
 				return;
 
-			code = new TokenBuffer(anotherToken.code.toString());
+			code = new CodeBuffer(anotherToken.code.toString());
 			type = anotherToken.type;
 			line = anotherToken.line;
 		}
@@ -551,7 +551,7 @@ public abstract class JsParser {
 			Token temp = new Token();
 			c = c > 2 ? 2 : c;
 			for (; c > 0; --c) {
-				temp.code = new TokenBuffer("\n");
+				temp.code = new CodeBuffer("\n");
 				temp.type = OPER_TYPE;
 				mTokenBQueue.offer(temp);
 			}

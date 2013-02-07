@@ -27,21 +27,21 @@ import java.io.Serializable;
  * @version 0.9
  * 
  */
-public class TokenBuffer implements Serializable, CharSequence {
+public class CodeBuffer implements Serializable, CharSequence {
 
 	private static final long serialVersionUID = 4063766941723794799L;
 
 	private StringBuffer mValue;
 
-	public TokenBuffer() {
+	public CodeBuffer() {
 		mValue = new StringBuffer();
 	}
 
-	public TokenBuffer(String string) {
+	public CodeBuffer(String string) {
 		mValue = new StringBuffer(string);
 	}
 
-	public TokenBuffer(char ch) {
+	public CodeBuffer(char ch) {
 		mValue = new StringBuffer();
 		mValue.append(ch);
 	}
