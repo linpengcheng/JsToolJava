@@ -10,28 +10,27 @@ import org.sunjw.js.util.TokenBuffer;
 /**
  * JsParser <br>
  * A JavaScript code parser in Java. <br>
- * Based on jsparser.h & jsparser.cpp.
+ * Based on jsparser.h & jsparser.cpp.<br>
+ * <br>
+ * Copyright (c) 2012-
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 51
+ * Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  * 
  * @author Sun Junwen
  * @date 2013-1-29
  * @version 0.9
- * 
- *          Copyright (c) 2012-
- * 
- *          This program is free software; you can redistribute it and/or modify
- *          it under the terms of the GNU General Public License as published by
- *          the Free Software Foundation; either version 2 of the License, or
- *          (at your option) any later version.
- * 
- *          This program is distributed in the hope that it will be useful, but
- *          WITHOUT ANY WARRANTY; without even the implied warranty of
- *          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- *          General Public License for more details.
- * 
- *          You should have received a copy of the GNU General Public License
- *          along with this program; if not, write to the Free Software
- *          Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- *          02110-1301, USA.
  * 
  */
 public abstract class JsParser {
@@ -40,6 +39,23 @@ public abstract class JsParser {
 	protected static final int REGULAR_TYPE = 2;
 	protected static final int COMMENT_TYPE_1 = 9; // 单行注释
 	protected static final int COMMENT_TYPE_2 = 10; // 多行注释
+
+	protected static final char JS_IF = 'i';
+	protected static final char JS_ELSE = 'e';
+	protected static final char JS_FOR = 'f';
+	protected static final char JS_DO = 'd';
+	protected static final char JS_WHILE = 'w';
+	protected static final char JS_SWITCH = 's';
+	protected static final char JS_CASE = 'c';
+	protected static final char JS_TRY = 'r';
+	protected static final char JS_CATCH = 'h';
+	protected static final char JS_FUNCTION = 'n';
+	protected static final char JS_ASSIGN = '=';
+	protected static final char JS_BLOCK = '{';
+	protected static final char JS_BRACKET = '(';
+	protected static final char JS_SQUARE = '[';
+	protected static final char JS_HELPER = '\\';
+	protected static final char JS_EMPTY = 0;
 
 	protected class Token {
 		TokenBuffer code;
@@ -233,10 +249,10 @@ public abstract class JsParser {
 			mCharA = mCharB;
 			if (mCharA == 0)
 				return;
-			
-			if(mCharA == '\n')
+
+			if (mCharA == '\n')
 				++mLineCount;
-			
+
 			do {
 				mCharB = getChar();
 			} while (mCharB == '\r');
@@ -399,8 +415,8 @@ public abstract class JsParser {
 					mTokenB.code.append(mCharB);
 					mCharB = getChar();
 					if ((mTokenB.code.equals("==") || mTokenB.code.equals("!=")
-							|| mTokenB.code.equals("<<") || mTokenB.code.equals(">>"))
-							&& mCharB == '=') {
+							|| mTokenB.code.equals("<<") || mTokenB.code
+								.equals(">>")) && mCharB == '=') {
 						// 三字符 ===, !==, <<=, >>=
 						mTokenB.code.append(mCharB);
 						mCharB = getChar();
@@ -477,7 +493,8 @@ public abstract class JsParser {
 				&& mTokenB.type != COMMENT_TYPE_1
 				&& mTokenB.type != COMMENT_TYPE_2
 				&& ((mTokenA.type != STRING_TYPE && mStrBeforeReg
-						.indexOf(tokenALast) != -1) || mTokenA.code.equals("return"))) {
+						.indexOf(tokenALast) != -1) || mTokenA.code
+						.equals("return"))) {
 			mBRegular = true;
 			getTokenRaw(); // 把正则内容加到 m_tokenB
 		}
@@ -495,10 +512,11 @@ public abstract class JsParser {
 		 */
 		if (mTokenB.type == OPER_TYPE
 				&& (mTokenB.code.equals("-") || mTokenB.code.equals("+"))
-				&& (mTokenA.type != STRING_TYPE || mTokenA.code.equals("return"))
-				&& mTokenA.type != REGULAR_TYPE && !mTokenA.code.equals("++")
-				&& !mTokenA.code.equals("--") && !mTokenA.code.equals("]")
-				&& !mTokenA.code.equals(")") && isNormalChar(mCharB)) {
+				&& (mTokenA.type != STRING_TYPE || mTokenA.code
+						.equals("return")) && mTokenA.type != REGULAR_TYPE
+				&& !mTokenA.code.equals("++") && !mTokenA.code.equals("--")
+				&& !mTokenA.code.equals("]") && !mTokenA.code.equals(")")
+				&& isNormalChar(mCharB)) {
 			// m_tokenB 实际上是正负数
 			mBPosNeg = true;
 			getTokenRaw();

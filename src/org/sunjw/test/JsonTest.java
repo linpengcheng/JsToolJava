@@ -17,7 +17,7 @@ public class JsonTest {
 		}
 
 		String inputFile = args[0];
-		String outputFile = args[1];
+		// String outputFile = args[1];
 
 		JsonFileProc jfp = new JsonFileProc(inputFile);
 		JsonValue jsonValue = new JsonValue();

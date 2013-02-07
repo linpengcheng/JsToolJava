@@ -6,47 +6,30 @@ import java.util.Stack;
 /**
  * JsonParser <br>
  * A Json parser in Java. <br>
- * Based on jsonparser.h & jsonparser.cpp.
+ * Based on jsonparser.h & jsonparser.cpp.<br>
+ * <br>
+ * Copyright (c) 2012-
+ * 
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your option) any later
+ * version.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+ * details.
+ * 
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 51
+ * Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  * 
  * @author Sun Junwen
  * @date 2013-1-29
  * @version 0.9
  * 
- *          Copyright (c) 2012-
- * 
- *          This program is free software; you can redistribute it and/or modify
- *          it under the terms of the GNU General Public License as published by
- *          the Free Software Foundation; either version 2 of the License, or
- *          (at your option) any later version.
- * 
- *          This program is distributed in the hope that it will be useful, but
- *          WITHOUT ANY WARRANTY; without even the implied warranty of
- *          MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- *          General Public License for more details.
- * 
- *          You should have received a copy of the GNU General Public License
- *          along with this program; if not, write to the Free Software
- *          Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- *          02110-1301, USA.
- * 
  */
 public abstract class JsonParser extends JsParser {
-	public static final char JS_IF = 'i';
-	public static final char JS_ELSE = 'e';
-	public static final char JS_FOR = 'f';
-	public static final char JS_DO = 'd';
-	public static final char JS_WHILE = 'w';
-	public static final char JS_SWITCH = 's';
-	public static final char JS_CASE = 'c';
-	public static final char JS_TRY = 'r';
-	public static final char JS_CATCH = 'h';
-	public static final char JS_FUNCTION = 'n';
-	public static final char JS_ASSIGN = '=';
-	public static final char JS_BLOCK = '{';
-	public static final char JS_BRACKET = '(';
-	public static final char JS_SQUARE = '[';
-	public static final char JS_HELPER = '\\';
-	public static final char JS_EMPTY = 0;
 
 	private int mNRecuLevel; // 块递归层次
 	private Stack<Character> mBlockStack;
