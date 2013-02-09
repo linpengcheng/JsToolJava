@@ -1,5 +1,6 @@
 package org.sunjw.js;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -214,6 +215,14 @@ public abstract class JsFormatter extends JsParser {
 	 */
 	protected abstract void putChar(char ch);
 
+	private void putToken(String token) {
+		putToken(token, "", "");
+	}
+
+	private void putToken(String token, String leftStyle) {
+		putToken(token, leftStyle, "");
+	}
+
 	private void putToken(String token, String leftStyle, String rightStyle) {
 		putString(leftStyle);
 		putString(token);
@@ -310,6 +319,512 @@ public abstract class JsFormatter extends JsParser {
 				if ((topStack = getStackTop(mBlockStack, null)) == null)
 					break;
 			}
+		}
+	}
+
+	public void go() throws IOException {
+		mBlockStack.push(' ');
+		mBrcNeedStack.push(true);
+
+		boolean bHaveNewLine;
+		char tokenAFirst;
+		char tokenBFirst;
+
+		mStartTime = System.currentTimeMillis();
+
+		while (getToken()) {
+			bHaveNewLine = false; // bHaveNewLine 表示后面将要换行，m_bNewLine 表示已经换行了
+			tokenAFirst = mTokenA.code.charAt(0);
+			tokenBFirst = (mTokenB.code.length() > 0) ? mTokenB.code.charAt(0)
+					: 0;
+			if (tokenBFirst == '\r')
+				tokenBFirst = '\n';
+			if (tokenBFirst == '\n' || mTokenB.type == COMMENT_TYPE_1)
+				bHaveNewLine = true;
+
+			if (!mBBlockStmt && !mTokenA.code.equals("{")
+					&& !mTokenA.code.equals("\n")
+					&& mTokenA.type != COMMENT_TYPE_1
+					&& mTokenA.type != COMMENT_TYPE_2)
+				mBBlockStmt = true;
+
+			/*
+			 * 参考 m_tokenB 来处理 m_tokenA 输出或不输出 m_tokenA 下一次循环时自动会用 m_tokenB 覆盖
+			 * m_tokenA
+			 */
+			// PutToken(m_tokenA);
+			switch (mTokenA.type) {
+			case REGULAR_TYPE:
+				putToken(mTokenA.code.toString()); // 正则表达式直接输出，前后没有任何样式
+				break;
+			case COMMENT_TYPE_1:
+			case COMMENT_TYPE_2:
+				if (mTokenA.code.charAt(1) == '*') {
+					// 多行注释
+					if (!bHaveNewLine)
+						putToken(mTokenA.code.toString(), "", "\n"); // 需要换行
+					else
+						putToken(mTokenA.code.toString());
+				} else {
+					// 单行注释
+					putToken(mTokenA.code.toString()); // 肯定会换行的
+				}
+				mBCommentPut = true;
+				break;
+			case OPER_TYPE:
+				processOper(bHaveNewLine, tokenAFirst, tokenBFirst);
+
+				break;
+			case STRING_TYPE:
+				processString(bHaveNewLine, tokenAFirst, tokenBFirst);
+				break;
+			}
+		}
+
+		mLineBuffer = new StringBuffer(trimString(mLineBuffer.toString()));
+		if (mLineBuffer.length() > 0)
+			putLineBuffer();
+
+		mEndTime = System.currentTimeMillis();
+		mDuration = mEndTime - mStartTime;
+		if (mDebugOutput) {
+			System.out.println("Processed tokens: " + mTokenCount);
+			System.out.println("Time used: " + mDuration + "s");
+			System.out.println((mTokenCount / mDuration) + " tokens/second");
+		}
+	}
+
+	private void processOper(boolean bHaveNewLine, char tokenAFirst,
+			char tokenBFirst) {
+		char topStack = 0;// = m_blockStack.top();
+		topStack = getStackTop(mBlockStack, topStack);
+		String strRight = new String(" ");
+
+		if (mTokenA.code.equals("(") || mTokenA.code.equals(")")
+				|| mTokenA.code.equals("[") || mTokenA.code.equals("]")
+				|| mTokenA.code.equals("!") || mTokenA.code.equals("!!")
+				|| mTokenA.code.equals("~") || mTokenA.code.equals("^")
+				|| mTokenA.code.equals(".")) {
+			// ()[]!. 都是前后没有样式的运算符
+			if ((mTokenA.code.equals(")") || mTokenA.code.equals("]"))
+					&& (topStack == JS_ASSIGN || topStack == JS_HELPER)) {
+				if (topStack == JS_ASSIGN)
+					--mNIndents;
+				mBlockStack.pop();
+			}
+			topStack = getStackTop(mBlockStack, topStack);
+			if ((mTokenA.code.equals(")") && topStack == JS_BRACKET)
+					|| (mTokenA.code.equals("]") && topStack == JS_SQUARE)) {
+				// )] 需要弹栈，减少缩进
+				mBlockStack.pop();
+				--mNIndents;
+				topStack = getStackTop(mBlockStack, topStack);
+				// topStack = m_blockStack.top();
+				if (topStack == JS_ASSIGN || topStack == JS_HELPER)
+					mBlockStack.pop();
+			}
+
+			topStack = getStackTop(mBlockStack, topStack);
+			if (mTokenA.code.equals(")")
+					&& !mBrcNeedStack.peek()
+					&& (topStack == JS_IF || topStack == JS_FOR
+							|| topStack == JS_WHILE || topStack == JS_SWITCH || topStack == JS_CATCH)) {
+				// 栈顶的 if, for, while, switch, catch 正在等待 )，之后换行增加缩进
+				// 这里的空格和下面的空格是留给 { 的，m_bNLBracket 为 true 则不需要空格了
+				String rightDeco = (!mTokenB.code.equals(";")) ? strRight : "";
+				if (!bHaveNewLine)
+					rightDeco += "\n";
+				putToken(mTokenA.code.toString(), "", rightDeco);
+				// bBracket = true;
+				mBrcNeedStack.pop();
+				mBBlockStmt = false; // 等待 statment
+				if (isStackTopEq(mBlockStack, JS_WHILE)) // m_blockStack.top()
+															// == JS_WHILE
+				{
+					mBlockStack.pop();
+					if (isStackTopEq(mBlockStack, JS_DO)) // m_blockStack.top()
+															// == JS_DO
+					{
+						// 结束 do...while
+						mBlockStack.pop();
+
+						popMultiBlock(JS_WHILE);
+					} else {
+						mBlockStack.push(JS_WHILE);
+						++mNIndents;
+					}
+				} else
+					++mNIndents;
+			} else if (mTokenA.code.equals(")")
+					&& (mTokenB.code.equals("{") || bHaveNewLine))
+				putToken(mTokenA.code.toString(), "", strRight); // { 或者换行之前留个空格
+			else
+				putToken(mTokenA.code.toString()); // 正常输出
+
+			if (mTokenA.code.equals("(") || mTokenA.code.equals("[")) {
+				// ([ 入栈，增加缩进
+				topStack = getStackTop(mBlockStack, topStack);
+				// topStack = m_blockStack.top();
+				if (topStack == JS_ASSIGN) {
+					if (!mBAssign)
+						--mNIndents;
+					else
+						mBlockStack.push(JS_HELPER);
+				}
+				mBlockStack.push(mBlockMap.get(mTokenA.code.toString()));
+				++mNIndents;
+			}
+
+			return;
+		}
+
+		if (mTokenA.code.equals(";")) {
+			topStack = getStackTop(mBlockStack, topStack);
+			// topStack = m_blockStack.top();
+			if (topStack == JS_ASSIGN) {
+				--mNIndents;
+				mBlockStack.pop();
+			}
+
+			topStack = getStackTop(mBlockStack, topStack);
+			// topStack = m_blockStack.top();
+
+			// ; 结束 if, else, while, for, try, catch
+			if (topStack == JS_IF || topStack == JS_FOR || topStack == JS_WHILE
+					|| topStack == JS_CATCH) {
+				mBlockStack.pop();
+				--mNIndents;
+				// 下面的 } 有同样的处理
+				popMultiBlock(topStack);
+			}
+			if (topStack == JS_ELSE || topStack == JS_TRY) {
+				mBlockStack.pop();
+				--mNIndents;
+				popMultiBlock(topStack);
+			}
+			if (topStack == JS_DO) {
+				--mNIndents;
+				popMultiBlock(topStack);
+			}
+			// do 在读取到 while 后才修改计数
+			// 对于 do{} 也一样
+
+			// if(m_blockStack.top() == 't')
+			// m_blockStack.pop(); // ; 也结束变量声明，暂时不压入 t
+
+			topStack = getStackTop(mBlockStack, topStack);
+			// topStack = m_blockStack.top();
+			if (topStack != JS_BRACKET && !bHaveNewLine)
+				putToken(mTokenA.code.toString(), "", (strRight += "\n")); // 如果不是
+																			// ()
+																			// 里的
+																			// ;
+																			// 就换行
+			else if (topStack == JS_BRACKET || mTokenB.type == COMMENT_TYPE_1)
+				putToken(mTokenA.code.toString(), "", strRight); // (; ) 空格
+			else
+				putToken(mTokenA.code.toString());
+
+			return; // ;
+		}
+
+		if (mTokenA.code.equals(",")) {
+			if (isStackTopEq(mBlockStack, JS_ASSIGN)) // m_blockStack.top() ==
+														// JS_ASSIGN
+			{
+				--mNIndents;
+				mBlockStack.pop();
+			}
+			if (isStackTopEq(mBlockStack, JS_BLOCK) && !bHaveNewLine)
+				putToken(mTokenA.code.toString(), "", (strRight += "\n")); // 如果是
+																			// {}
+																			// 里的
+			else
+				putToken(mTokenA.code.toString(), "", strRight);
+
+			return; // ,
+		}
+
+		if (mTokenA.code.equals("{")) {
+			topStack = getStackTop(mBlockStack, topStack);
+			if (topStack == JS_IF || topStack == JS_FOR || topStack == JS_WHILE
+					|| topStack == JS_DO || topStack == JS_ELSE
+					|| topStack == JS_SWITCH || topStack == JS_TRY
+					|| topStack == JS_CATCH || topStack == JS_ASSIGN) {
+				if (!mBBlockStmt || topStack == JS_ASSIGN)// (topStack ==
+															// JS_ASSIGN &&
+															// !m_bAssign))
+				{
+					// m_blockStack.pop(); // 不把那个弹出来，遇到 } 时一起弹
+					--mNIndents;
+					mBBlockStmt = true;
+				} else {
+					mBlockStack.push(JS_HELPER); // 压入一个 JS_HELPER 统一状态
+				}
+			}
+
+			// 修正({...}) 中多一次缩进
+			boolean bPrevFunc = (topStack == JS_FUNCTION);
+			char fixTopStack = topStack;
+			if (bPrevFunc) {
+				mBlockStack.pop(); // 弹掉 JS_FUNCTION
+				fixTopStack = getStackTop(mBlockStack, fixTopStack);
+			}
+
+			if (fixTopStack == JS_BRACKET) {
+				--mNIndents; // ({ 减掉一个缩进
+			}
+
+			if (bPrevFunc) {
+				mBlockStack.push(JS_FUNCTION); // 压回 JS_FUNCTION
+			}
+
+			mBlockStack.push(mBlockMap.get(mTokenA.code.toString())); // 入栈，增加缩进
+			++mNIndents;
+
+			/*
+			 * { 之间的空格都是由之前的符号准备好的 这是为了解决 { 在新行时，前面会多一个空格的问题 因为算法只能向后，不能向前看
+			 */
+			if (mTokenB.code.equals("}")) {
+				// 空 {}
+				mBEmptyBracket = true;
+				if (mBNewLine == false
+						&& mBNLBracket
+						&& (topStack == JS_IF || topStack == JS_FOR
+								|| topStack == JS_WHILE
+								|| topStack == JS_SWITCH
+								|| topStack == JS_CATCH || topStack == JS_FUNCTION)) {
+					putToken(mTokenA.code.toString(), " "); // 这些情况下，前面补一个空格
+				} else {
+					putToken(mTokenA.code.toString());
+				}
+			} else {
+				String strLeft = (mBNLBracket && !mBNewLine) ? new String("\n")
+						: new String("");
+				if (!bHaveNewLine) // 需要换行
+					putToken(mTokenA.code.toString(), strLeft,
+							(strRight += "\n"));
+				else
+					putToken(mTokenA.code.toString(), strLeft, strRight);
+			}
+
+			return; // {
+		}
+
+		if (mTokenA.code.equals("}")) {
+			// topStack = m_blockStack.top();
+
+			// 激进的策略，} 一直弹到 {
+			// 这样做至少可以使得 {} 之后是正确的
+			while ((topStack = getStackTop(mBlockStack, (char) 0)) != 0) {
+				if (topStack == JS_BLOCK)
+					break;
+
+				mBlockStack.pop();
+
+				switch (topStack) {
+				case JS_IF:
+				case JS_FOR:
+				case JS_WHILE:
+				case JS_CATCH:
+				case JS_DO:
+				case JS_ELSE:
+				case JS_TRY:
+				case JS_SWITCH:
+				case JS_ASSIGN:
+				case JS_FUNCTION:
+				case JS_HELPER:
+					--mNIndents;
+					break;
+				}
+
+				/*
+				 * if(!GetStackTop(m_blockStack, topStack)) break;
+				 */
+				// topStack = m_blockStack.top();
+			}
+
+			if (topStack == JS_BLOCK) {
+				// 弹栈，减小缩进
+				mBlockStack.pop();
+				--mNIndents;
+				topStack = getStackTop(mBlockStack, (char) 0);
+				boolean bGetTop = (topStack != 0);// = m_blockStack.top();
+
+				if (bGetTop) {
+					switch (topStack) {
+					case JS_IF:
+					case JS_FOR:
+					case JS_WHILE:
+					case JS_CATCH:
+					case JS_ELSE:
+					case JS_TRY:
+					case JS_SWITCH:
+					case JS_ASSIGN:
+					case JS_FUNCTION:
+					case JS_HELPER:
+						mBlockStack.pop();
+						break;
+					case JS_DO:
+						// 缩进已经处理，do 留给 while
+						break;
+					}
+				}
+				// topStack = m_blockStack.top();
+			}
+
+			String leftStyle = new String("");
+			if (!mBNewLine)
+				leftStyle = "\n";
+			if (mBEmptyBracket) {
+				leftStyle = "";
+				strRight += "\n";
+				mBEmptyBracket = false;
+			}
+
+			if ((!bHaveNewLine && !mTokenB.code.equals(";") && !mTokenB.code
+					.equals(","))
+					&& (mBNLBracket || !((topStack == JS_DO && mTokenB.code
+							.equals("while"))
+							|| (topStack == JS_IF && mTokenB.code
+									.equals("else"))
+							|| (topStack == JS_TRY && mTokenB.code
+									.equals("catch")) || mTokenB.code
+								.equals(")"))))
+				putToken(mTokenA.code.toString(), leftStyle, (strRight += "\n")); // 一些情况换行
+			else if (mTokenB.type == STRING_TYPE
+					|| mTokenB.type == COMMENT_TYPE_1)
+				putToken(mTokenA.code.toString(), leftStyle, strRight); // 为
+																		// else
+																		// 准备的空格
+			else
+				putToken(mTokenA.code.toString(), leftStyle); // }, }; })
+			// 注意 ) 不要在输出时仿照 ,; 取消前面的换行
+
+			// char tmpTopStack;
+			// GetStackTop(m_blockStack, tmpTopStack);
+			if (topStack != JS_ASSIGN && isStackTopEq(mBlockStack, JS_BRACKET))
+				++mNIndents;
+
+			popMultiBlock(topStack);
+
+			return; // }
+		}
+
+		if (mTokenA.code.equals("++") || mTokenA.code.equals("--")
+				|| mTokenA.code.equals("\n") || mTokenA.code.equals("\r\n")) {
+			putToken(mTokenA.code.toString());
+			return;
+		}
+
+		if (mTokenA.code.equals(":") && isStackTopEq(mBlockStack, JS_CASE)) // m_blockStack.top()
+		// ==
+		// JS_CASE
+		{
+			// case, default
+			if (!bHaveNewLine)
+				putToken(mTokenA.code.toString(), "", (strRight += "\n"));
+			else
+				putToken(mTokenA.code.toString(), "", strRight);
+			mBlockStack.pop();
+			return;
+		}
+
+		if (mTokenA.code.equals("::") || mTokenA.code.equals("->")) {
+			putToken(mTokenA.code.toString());
+			return;
+		}
+
+		if (isStackTopEq(mBlockStack, JS_ASSIGN)) // m_blockStack.top() ==
+													// JS_ASSIGN
+			mBAssign = true;
+
+		if (mTokenA.code.equals("=") && !isStackTopEq(mBlockStack, JS_ASSIGN)) // m_blockStack.top()
+																				// !=
+																				// JS_ASSIGN)
+		{
+			mBlockStack.push(mBlockMap.get(mTokenA.code.toString()));
+			++mNIndents;
+			mBAssign = false;
+		}
+
+		putToken(mTokenA.code.toString(), " ", " "); // 剩余的操作符都是 空格oper空格
+	}
+
+	private void processString(boolean bHaveNewLine, char tokenAFirst,
+			char tokenBFirst) {
+		if (mTokenA.code.equals("case") || mTokenA.code.equals("default")) {
+			// case, default 往里面缩一格
+			--mNIndents;
+			String rightDeco = !mTokenA.code.equals("default") ? new String(" ")
+					: new String();
+			putToken(mTokenA.code.toString(), "", rightDeco);
+			++mNIndents;
+			mBlockStack.push(mBlockMap.get(mTokenA.code.toString()));
+			return;
+		}
+
+		if (mTokenA.code.equals("do")
+				|| (mTokenA.code.equals("else") && !mTokenB.code.equals("if"))
+				|| mTokenA.code.equals("try") || mTokenA.code.equals("finally")) {
+			// do, else (NOT else if), try
+			putToken(mTokenA.code.toString());
+
+			mBlockStack.push(mBlockMap.get(mTokenA.code.toString()));
+			++mNIndents; // 无需 ()，直接缩进
+			mBBlockStmt = false; // 等待 block 内部的 statment
+
+			putString(" ");
+			if ((mTokenB.type == STRING_TYPE || mBNLBracket) && !bHaveNewLine)
+				putString("\n");
+
+			return;
+		}
+
+		if (mTokenA.code.equals("function")) {
+			if (isStackTopEq(mBlockStack, JS_ASSIGN)) // m_blockStack.top() ==
+														// JS_ASSIGN)
+			{
+				--mNIndents;
+				mBlockStack.pop();
+			}
+			mBlockStack.push(mBlockMap.get(mTokenA.code.toString())); // 把
+																		// function
+																		// 也压入栈，遇到
+			// } 弹掉
+		}
+
+		if (isStackTopEq(mBlockStack, JS_ASSIGN)) // m_blockStack.top() ==
+													// JS_ASSIGN
+			mBAssign = true;
+
+		if (mTokenB.type == STRING_TYPE || mTokenB.type == COMMENT_TYPE_1
+				|| mTokenB.type == COMMENT_TYPE_2 || mTokenB.code.equals("{")) {
+			putToken(mTokenA.code.toString(), "", " ");
+
+			// if(m_blockStack.top() != 't' && IsType(m_tokenA))
+			// m_blockStack.push('t'); // 声明变量
+			return;
+		}
+
+		if (mSpecKeywordSet.contains(mTokenA.code.toString())
+				&& !mTokenB.code.equals(";"))
+			putToken(mTokenA.code.toString(), "", " ");
+		else
+			putToken(mTokenA.code.toString());
+
+		if (mTokenA.code.equals("if") || mTokenA.code.equals("for")
+				|| mTokenA.code.equals("while") || mTokenA.code.equals("catch")) {
+			// 等待 ()，() 到来后才能加缩进
+			mBrcNeedStack.push(false);
+			mBlockStack.push(mBlockMap.get(mTokenA.code.toString()));
+
+		}
+
+		if (mTokenA.code.equals("switch")) {
+			// bBracket = false;
+			mBrcNeedStack.push(false);
+			mBlockStack.push(mBlockMap.get(mTokenA.code.toString()));
 		}
 	}
 }
