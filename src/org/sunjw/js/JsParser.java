@@ -471,7 +471,7 @@ public abstract class JsParser {
 			mTokenB = new Token(temp);
 		}
 
-		return (mCharA != 0 && mTokenA.code.length() != 0);
+		return (mCharA != 0 || mTokenA.code.length() != 0);
 	}
 
 	/**

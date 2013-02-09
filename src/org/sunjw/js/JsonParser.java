@@ -212,8 +212,8 @@ public abstract class JsonParser extends JsParser {
 			mDuration = mEndTime - mStartTime;
 			if (debugOutput) {
 				System.out.println("Processed tokens: " + mTokenCount);
-				System.out.println("Time used: " + mDuration + "s");
-				System.out.println(mTokenCount / mDuration + " tokens/second");
+				System.out.println("Time used: " + mDuration + "ms");
+				System.out.println(mTokenCount / mDuration + " tokens/msecond");
 			}
 		}
 		// finished job

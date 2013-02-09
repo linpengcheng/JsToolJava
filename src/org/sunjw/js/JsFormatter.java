@@ -38,7 +38,7 @@ import org.sunjw.js.util.CodeBuffer;
  */
 public abstract class JsFormatter extends JsParser {
 
-	public boolean mDebugOutput;
+	public boolean debugOutput;
 
 	private long mStartTime;
 	private long mEndTime;
@@ -66,6 +66,7 @@ public abstract class JsFormatter extends JsParser {
 	private char mChIndent; // 作为缩进的字符
 	private int mNChPerInd; // 每个缩进缩进字符个数
 
+	@SuppressWarnings("unused")
 	private boolean mBSkipCR; // 读取时跳过 \r
 	private boolean mBPutCR; // 使用 \r\n 作为换行
 
@@ -162,7 +163,7 @@ public abstract class JsFormatter extends JsParser {
 	private void init() {
 		mInitIndent = new String("");
 
-		mDebugOutput = false;
+		debugOutput = false;
 
 		mTokenCount = 0;
 
@@ -212,18 +213,20 @@ public abstract class JsFormatter extends JsParser {
 	 * 派生类需要实现如何输出字符
 	 * 
 	 * @param ch
+	 * @throws IOException
 	 */
-	protected abstract void putChar(char ch);
+	protected abstract void putChar(char ch) throws IOException;
 
-	private void putToken(String token) {
+	private void putToken(String token) throws IOException {
 		putToken(token, "", "");
 	}
 
-	private void putToken(String token, String leftStyle) {
+	private void putToken(String token, String leftStyle) throws IOException {
 		putToken(token, leftStyle, "");
 	}
 
-	private void putToken(String token, String leftStyle, String rightStyle) {
+	private void putToken(String token, String leftStyle, String rightStyle)
+			throws IOException {
 		putString(leftStyle);
 		putString(token);
 		putString(rightStyle);
@@ -231,7 +234,7 @@ public abstract class JsFormatter extends JsParser {
 			mBCommentPut = false; // 这个一定会发生在注释之后的任何输出后面
 	}
 
-	private void putString(String str) {
+	private void putString(String str) throws IOException {
 		int length = str.length();
 		for (int i = 0; i < length; ++i) {
 			if (mBNewLine
@@ -262,7 +265,7 @@ public abstract class JsFormatter extends JsParser {
 		}
 	}
 
-	private void putLineBuffer() {
+	private void putLineBuffer() throws IOException {
 		CodeBuffer line = new CodeBuffer("");
 		line.append(trimRightSpace(mLineBuffer.toString()));
 
@@ -387,15 +390,15 @@ public abstract class JsFormatter extends JsParser {
 
 		mEndTime = System.currentTimeMillis();
 		mDuration = mEndTime - mStartTime;
-		if (mDebugOutput) {
+		if (debugOutput) {
 			System.out.println("Processed tokens: " + mTokenCount);
-			System.out.println("Time used: " + mDuration + "s");
-			System.out.println((mTokenCount / mDuration) + " tokens/second");
+			System.out.println("Time used: " + mDuration + "ms");
+			System.out.println((mTokenCount / mDuration) + " tokens/ms");
 		}
 	}
 
 	private void processOper(boolean bHaveNewLine, char tokenAFirst,
-			char tokenBFirst) {
+			char tokenBFirst) throws IOException {
 		char topStack = 0;// = m_blockStack.top();
 		topStack = getStackTop(mBlockStack, topStack);
 		String strRight = new String(" ");
@@ -752,7 +755,7 @@ public abstract class JsFormatter extends JsParser {
 	}
 
 	private void processString(boolean bHaveNewLine, char tokenAFirst,
-			char tokenBFirst) {
+			char tokenBFirst) throws IOException {
 		if (mTokenA.code.equals("case") || mTokenA.code.equals("default")) {
 			// case, default 往里面缩一格
 			--mNIndents;
