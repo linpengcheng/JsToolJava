@@ -5,7 +5,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import org.sunjw.js.JsfFile;
+import org.sunjw.js.JsfString;
 
 public class JsfTest {
 
@@ -26,9 +26,20 @@ public class JsfTest {
 		try {
 			fr = new FileReader(inputFile);
 			fw = new FileWriter(outputFile);
-			JsfFile jff = new JsfFile(fr, fw, '\t', 1, false, false);
-			jff.debugOutput = true;
-			jff.go();
+
+			// Read from file.
+			String source = readWholeFile(fr);
+
+			// JsfString
+			StringBuffer result = new StringBuffer();
+			JsfString jsf = new JsfString(source, result, ' ', 4, false, false,
+					false);
+			jsf.debugOutput = true;
+			jsf.go();
+
+			// Write to file.
+			writeWholeFile(fw, result.toString());
+
 			fr.close();
 			fw.close();
 		} catch (FileNotFoundException e) {
@@ -36,5 +47,21 @@ public class JsfTest {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	private static String readWholeFile(FileReader fr) throws IOException {
+		StringBuffer sb = new StringBuffer();
+
+		int c = 0;
+		while ((c = fr.read()) != -1) {
+			sb.append((char) c);
+		}
+
+		return sb.toString();
+	}
+
+	private static void writeWholeFile(FileWriter fw, String text)
+			throws IOException {
+		fw.write(text);
 	}
 }
